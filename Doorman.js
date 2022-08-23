@@ -1,18 +1,23 @@
-const { Client, GatewayIntentBits, Partials } = require("discord.js");
+const {
+  Client,
+  Intents,
+  MessageActionRow,
+  MessageButton,
+  ReactionUserManager,
+} = require("discord.js");
 const auth = require("./auth.json");
 const fs = require("fs");
-var sqlite3 = require("sqlite3").verbose();
-var file = "./database/database.db";
-let db = new sqlite3.Database(file);
+const { openDb } = require("./databaseHandler.js");
+
+let db;
 
 // Initialize Discord Bot
 const intents = [
-  GatewayIntentBits.DirectMessages,
-  GatewayIntentBits.GuildMembers,
-  GatewayIntentBits.MessageContent,
+  Intents.FLAGS.GUILDS,
+  Intents.FLAGS.GUILD_MEMBERS,
+  Intents.FLAGS.DIRECT_MESSAGES,
 ];
-
-const partials = [Partials.GuildMember, Partials.Channel];
+const partials = ["GUILD_MEMBER", "CHANNEL"];
 
 const client = new Client({
   intents: intents,
@@ -20,12 +25,14 @@ const client = new Client({
 });
 
 client.on("ready", async () => {
+  // open database
+  db = await openDb();
+
   // create all the tables if they have not yet been created
   const schema = fs.readFileSync("./database/schema.sql").toString();
   const schemaArr = schema.toString().split(");");
 
-  // db.getDatabaseInstance().serialize(() => {
-  db.serialize(() => {
+  db.getDatabaseInstance().serialize(() => {
     db.run("PRAGMA foreign_keys=OFF;");
     schemaArr.forEach((query) => {
       if (query) {
@@ -35,127 +42,146 @@ client.on("ready", async () => {
     });
   });
 
+  // const button = new MessageActionRow().addComponents(
+  //   new MessageButton()
+  //     .setCustomId(`RETRY dummyval`)
+  //     .setLabel("Retry")
+  //     .setStyle("SUCCESS")
+  // );
+
+  // const channel = await client.channels.fetch("1011279001412714548");
+  // channel.send({
+  //   embeds: [
+  //     {
+  //       description: `If your DM permissions were off and you have fixed them, press the button below:`,
+  //       color: 0x00274c,
+  //     },
+  //   ],
+  //   components: [button],
+  // });
+
   console.log(`Logged in as ${client.user.tag}!`);
 });
 
 client.on("guildMemberAdd", async function (member) {
-  let sql = `INSERT INTO users (userid, stage, name, uniqname) VALUES (?, 0, "", "") RETURNING *`;
-  db.run(sql, [member.id], (err, row) => {
-    console.log(row.userid);
-  });
+  let sql = `INSERT INTO users (userid, stage, name, uniqname) VALUES (?, 0, "", "")`;
+  await db.run(sql, [member.id]);
 
-  member.send({
-    embeds: [
-      {
-        description: `Welcome to the AIV server! Please fill out these quick questions so we can verify you're a real person.`,
-        color: 0x00274c,
-      },
-      {
-        description: `What is your full name (first and last)?`,
-        color: 0x00274c,
-      },
-    ],
-  });
+  member
+    .send({
+      embeds: [
+        {
+          description: `Welcome to the AIV server! Please fill out these quick questions so we can verify you're a real person.`,
+          color: 0x00274c,
+        },
+        {
+          description: `1) What is your full name (first and last)?`,
+          color: 0x00274c,
+        },
+      ],
+    })
+    .catch(() => {
+      let sql = `DELETE FROM users WHERE userid = ?`;
+      db.run(sql, [member.id]);
+    });
 });
 
 client.on("messageCreate", async function (message) {
   let sql = `SELECT stage FROM users WHERE userid = ?`;
-  let data = await db.run(sql, [message.author.id]);
+  let data = await db.get(sql, [message.author.id]);
+  if (message.guild !== null || !data) {
+    return;
+  }
 
-  let x = await db.run(`SELECT userid FROM users`);
-
-  console.log("hello from messageCreate!");
-  console.log(data.stage);
-  console.log(message.author.id);
-  console.log(x.userid);
-  // console.log(x.userid);
-  // console.log(message.author.id === x.userid);
-
-  if (data) {
-    switch (data.stage) {
-      case 0:
-        sql = `UPDATE users SET stage = 1, name = ? WHERE userid = ?`;
-        db.run(sql, [message.content, message.author.id]);
-        message.author.send({
-          embeds: [
-            {
-              description: `2) What is your uniqname?`,
-              color: 0x00274c,
-            },
-          ],
-        });
-        break;
-      case 1:
-        sql = `UPDATE users SET stage = 2, uniqname = ? WHERE userid = ? RETURNING *`;
-        data = db.run(sql, [message.content, message.author.id]);
-        const buttons = new MessageActionRow().addComponents(
-          new MessageButton()
-            .setCustomId(`CONFIRM confirm ${data.userid}`)
-            .setLabel("Confirm")
-            .setStyle("SUCCESS"),
-          new MessageButton()
-            .setCustomId(`CONFIRM cancel ${data.userid}`)
-            .setLabel("Cancel")
-            .setStyle("DANGER")
-        );
-        message.author.send({
-          embeds: [
-            {
-              description: `Thanks! Please verify that this information looks correct:`,
-              color: 0x00274c,
-              fields: [
-                {
-                  name: `What is your full name (first and last)?`,
-                  value: data.name,
-                },
-                {
-                  name: `2) What is your uniqname?`,
-                  value: data.uniqname,
-                },
-              ],
-            },
-          ],
-          components: [buttons],
-        });
-        break;
-    }
+  switch (data.stage) {
+    case 0:
+      sql = `UPDATE users SET stage = 1, name = ? WHERE userid = ?`;
+      db.run(sql, [message.content, message.author.id]);
+      message.author.send({
+        embeds: [
+          {
+            description: `2) What is your uniqname?`,
+            color: 0x00274c,
+          },
+        ],
+      });
+      break;
+    case 1:
+      sql = `UPDATE users SET stage = 2, uniqname = ? WHERE userid = ?`;
+      await db.run(sql, [message.content, message.author.id]);
+      sql = `SELECT userid, name, uniqname FROM users WHERE userid = ?`;
+      data = await db.get(sql, [message.author.id]);
+      const buttons = new MessageActionRow().addComponents(
+        new MessageButton()
+          .setCustomId(`CONFIRM ${data.userid} confirm`)
+          .setLabel("Confirm")
+          .setStyle("SUCCESS"),
+        new MessageButton()
+          .setCustomId(`CONFIRM ${data.userid} cancel`)
+          .setLabel("Cancel")
+          .setStyle("DANGER")
+      );
+      message.author.send({
+        embeds: [
+          {
+            description: `Thanks! Please verify that this information looks correct:`,
+            color: 0x00274c,
+            fields: [
+              {
+                name: `1) What is your full name (first and last)?`,
+                value: data.name,
+              },
+              {
+                name: `2) What is your uniqname?`,
+                value: data.uniqname,
+              },
+            ],
+          },
+        ],
+        components: [buttons],
+      });
+      break;
   }
 });
 
 client.on("interactionCreate", async function (interaction) {
   if (interaction.isButton()) {
     const { customId } = interaction;
-    const split = customId.split(" ", 2);
-    const userid = split[2];
+    const split = customId.split(" ");
+    const userid = split[1];
+    let sql = ``;
 
     switch (split[0]) {
       case "CONFIRM":
-        if (split[1] == "confirm") {
+        if (split[2] == "confirm") {
           interaction.channel.send({
             embeds: [
               {
-                description: `Thanks for filling out the survey! You will be verified soon.`,
+                description: `Thanks for filling out the survey! You will be verified shortly.`,
                 color: 0x00274c,
               },
             ],
           });
 
-          let sql = `SELECT userid, name, uniqname FROM users WHERE userid = ?`;
-          let data = await db.run(sql, [userid]);
+          interaction.update({
+            components: [],
+          });
+
+          sql = `SELECT userid, name, uniqname FROM users WHERE userid = ?`;
+          let data = await db.get(sql, [userid]);
 
           const buttons = new MessageActionRow().addComponents(
             new MessageButton()
-              .setCustomId(`VERIFY admit ${data.userid}`)
+              .setCustomId(`VERIFY ${data.userid} admit`)
               .setLabel("Admit")
               .setStyle("SUCCESS"),
             new MessageButton()
-              .setCustomId(`VERIFY kick ${data.userid}`)
+              .setCustomId(`VERIFY ${data.userid} kick`)
               .setLabel("Kick")
               .setStyle("DANGER")
           );
 
-          // TODO: update this channel id when added to the actual server
-          const channel = client.channels.cache.get("1011353514544463874");
+          const channel = await client.channels.fetch("1011373609064861837");
           channel.send({
             embeds: [
               {
@@ -179,55 +205,146 @@ client.on("interactionCreate", async function (interaction) {
             ],
             components: [buttons],
           });
-        } else if (split[1] === "cancel") {
-          sql = `UPDATE users SET stage = 0, name = "", uniqname = "" WHERE userid = ?`;
+        } else if (split[2] === "cancel") {
+          let sql = `UPDATE users SET stage = 0, name = "", uniqname = "" WHERE userid = ?`;
           db.run(sql, [userid]);
-          interaction.user.send({
+
+          interaction.channel.send({
             embeds: [
               {
                 description: `Okay, restarting the survey.`,
                 color: 0x00274c,
               },
               {
-                description: `What is your full name (first and last)?`,
+                description: `1) What is your full name (first and last)?`,
                 color: 0x00274c,
               },
             ],
+          });
+
+          interaction.update({
+            components: [],
           });
         }
         break;
       case "VERIFY":
-        if (split[1] === "admit") {
-          const user = client.users.cache.get(userid);
-          let role = interaction.guild.roles.find(
+        if (split[2] === "admit") {
+          let role = await interaction.guild.roles.cache.find(
             (r) => r.id === "1011298638061899897"
           );
-          user.addRole(role);
-          user.send({
+
+          const member = interaction.guild.members.cache.get(userid);
+          member.roles.add(role);
+
+          sql = `SELECT name FROM users WHERE userid = ?`;
+          let data = await db.get(sql, [userid]);
+          member.setNickname(data.name);
+
+          member.send({
             embeds: [
               {
                 description: `You have been admitted to the AIV server!`,
-                color: 0x00274c,
+                color: 0x228b22,
               },
             ],
           });
-        } else if (split[1] === "kick") {
-          const user = client.users.cache.get(userid);
-          user.kick();
-          user.send({
+
+          let embed = interaction.message.embeds[0];
+          embed.setColor(0x228b22);
+          embed.setDescription("This user has been verified!");
+          interaction.update({
+            embeds: [embed],
+            components: [],
+          });
+        } else if (split[2] === "kick") {
+          const member = interaction.guild.members.cache.get(userid);
+          member.kick();
+          member.send({
             embeds: [
               {
                 description: `A verifier denied your survey and you were removed from the server. If you think something is wrong, rejoin the server at this link: https://discord.gg/NTZASbnCCM`,
+                color: 0xb83a36,
+              },
+            ],
+          });
+
+          let embed = interaction.message.embeds[0];
+          embed.setColor(0xb83a36);
+          embed.setDescription("This user was rejected.");
+          interaction.update({
+            embeds: [embed],
+            components: [],
+          });
+        }
+        sql = `DELETE FROM users WHERE userid = ?`;
+        db.run(sql, [userid]);
+        break;
+      case "RETRY":
+        sql = `SELECT userid FROM users WHERE userid = ?`;
+        let data = await db.get(sql, [interaction.user.id]);
+        if (data) {
+          interaction.reply({
+            embeds: [
+              {
+                description: `It looks like you should have received a DM from me already. Please check again.`,
+                color: 0x00274c,
+              },
+            ],
+            ephemeral: true,
+          });
+
+          break;
+        }
+
+        sql = `INSERT INTO users (userid, stage, name, uniqname) VALUES (?, 0, "", "")`;
+        await db.run(sql, [interaction.user.id]);
+
+        try {
+          await interaction.user.send({
+            embeds: [
+              {
+                description: `Welcome to the AIV server! Please fill out these quick questions so we can verify you're a real person.`,
+                color: 0x00274c,
+              },
+              {
+                description: `1) What is your full name (first and last)?`,
                 color: 0x00274c,
               },
             ],
           });
+
+          interaction.reply({
+            embeds: [
+              {
+                description: `Verification was sent! Check your DMs for a message from me.`,
+                color: 0x228b22,
+              },
+            ],
+            ephemeral: true,
+          });
+        } catch {
+          interaction.reply({
+            embeds: [
+              {
+                description: `It looks like your privacy settings still aren't fixed. Please double check that you are allowing DMs from server members, and try again.`,
+                color: 0xb83a36,
+              },
+            ],
+            ephemeral: true,
+          });
+          let sql = `DELETE FROM users WHERE userid = ?`;
+          db.run(sql, [interaction.user.id]);
+          break;
         }
-        let sql = `DELETE FROM users WHERE userid = ?`;
-        db.run(sql, [userid]);
+
         break;
     }
   }
+});
+
+client.on("guildMemberRemove", async function (member) {
+  let sql = `DELETE FROM users WHERE userid = ?`;
+  db.run(sql, [member.id]);
 });
 
 client.login(auth.token);
