@@ -1,0 +1,23 @@
+{
+  "name": "doorman",
+  "version": "1.0.0",
+  "description": "Keep your servers secure with easy survey verification.",
+  "main": "Doorman.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/abbyjng/Doorman.git"
+  },
+  "keywords": [],
+  "author": "beexng#2380",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/abbyjng/Doorman/issues"
+  },
+  "homepage": "https://github.com/abbyjng/Doorman#readme",
+  "dependencies": {
+    "better-sqlite3": "^7.6.2",
+    "discord.js": "^14.3.0",
+    "sqlite": "^4.1.2",
+    "sqlite3": "^5.0.11"
+  }
+}
