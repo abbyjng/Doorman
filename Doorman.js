@@ -234,11 +234,33 @@ client.on("interactionCreate", async function (interaction) {
           );
 
           const member = interaction.guild.members.cache.get(userid);
-          member.roles.add(role);
+          member.roles.add(role).catch(() => {
+            client.channels.fetch("1011373609064861837").then((channel) => {
+              channel.send({
+                embeds: [
+                  {
+                    description: `Something went wrong when assigning roles to <@!${member.id}>! Please double check and correct their roles.`,
+                    color: 0xb83a36,
+                  },
+                ],
+              });
+            });
+          });
 
           sql = `SELECT name FROM users WHERE userid = ?`;
           let data = await db.get(sql, [userid]);
-          member.setNickname(data.name);
+          member.setNickname(data.name).catch(() => {
+            client.channels.fetch("1011373609064861837").then((channel) => {
+              channel.send({
+                embeds: [
+                  {
+                    description: `Something went wrong when changing <@!${member.id}>'s nickname! Please double check and correct their nickname.`,
+                    color: 0xb83a36,
+                  },
+                ],
+              });
+            });
+          });
 
           member.send({
             embeds: [
