@@ -233,7 +233,10 @@ client.on("interactionCreate", async function (interaction) {
             (r) => r.id === "1011298638061899897"
           );
 
-          const member = interaction.guild.members.cache.get(userid);
+          const member = await interaction.guild.members.fetch({
+            user: userid,
+            force: true,
+          });
           member.roles.add(role).catch(() => {
             client.channels.fetch("1011373609064861837").then((channel) => {
               channel.send({
