@@ -1,9 +1,10 @@
 const {
   Client,
-  Intents,
-  MessageActionRow,
-  MessageButton,
-  ReactionUserManager,
+  GatewayIntentBits,
+  Partials,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
 } = require("discord.js");
 const auth = require("./auth.json");
 const fs = require("fs");
@@ -13,11 +14,11 @@ let db;
 
 // Initialize Discord Bot
 const intents = [
-  Intents.FLAGS.GUILDS,
-  Intents.FLAGS.GUILD_MEMBERS,
-  Intents.FLAGS.DIRECT_MESSAGES,
+  GatewayIntentBits.Guilds,
+  GatewayIntentBits.GuildMembers,
+  GatewayIntentBits.DirectMessages,
 ];
-const partials = ["GUILD_MEMBER", "CHANNEL"];
+const partials = [Partials.GuildMember, Partials.Channel];
 
 const client = new Client({
   intents: intents,
@@ -42,11 +43,11 @@ client.on("ready", async () => {
     });
   });
 
-  // const button = new MessageActionRow().addComponents(
-  //   new MessageButton()
+  // const button = new ActionRowBuilder().addComponents(
+  //   new ButtonBuilder()
   //     .setCustomId(`RETRY dummyval`)
   //     .setLabel("Retry")
-  //     .setStyle("SUCCESS")
+  //     .setStyle(ButtonStyle.Success)
   // );
 
   // const channel = await client.channels.fetch("1011279001412714548");
@@ -111,15 +112,15 @@ client.on("messageCreate", async function (message) {
       await db.run(sql, [message.content, message.author.id]);
       sql = `SELECT userid, name, uniqname FROM users WHERE userid = ?`;
       data = await db.get(sql, [message.author.id]);
-      const buttons = new MessageActionRow().addComponents(
-        new MessageButton()
+      const buttons = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
           .setCustomId(`CONFIRM ${data.userid} confirm`)
           .setLabel("Confirm")
-          .setStyle("SUCCESS"),
-        new MessageButton()
+          .setStyle(ButtonStyle.Success),
+        new ButtonBuilder()
           .setCustomId(`CONFIRM ${data.userid} cancel`)
           .setLabel("Cancel")
-          .setStyle("DANGER")
+          .setStyle(ButtonStyle.Danger)
       );
       message.author.send({
         embeds: [
@@ -170,15 +171,15 @@ client.on("interactionCreate", async function (interaction) {
           sql = `SELECT userid, name, uniqname FROM users WHERE userid = ?`;
           let data = await db.get(sql, [userid]);
 
-          const buttons = new MessageActionRow().addComponents(
-            new MessageButton()
+          const buttons = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
               .setCustomId(`VERIFY ${data.userid} admit`)
               .setLabel("Admit")
-              .setStyle("SUCCESS"),
-            new MessageButton()
+              .setStyle(ButtonStyle.Success),
+            new ButtonBuilder()
               .setCustomId(`VERIFY ${data.userid} kick`)
               .setLabel("Kick")
-              .setStyle("DANGER")
+              .setStyle(ButtonStyle.Danger)
           );
 
           const channel = await client.channels.fetch("1011373609064861837");
@@ -275,8 +276,8 @@ client.on("interactionCreate", async function (interaction) {
           });
 
           let embed = interaction.message.embeds[0];
-          embed.setColor(0x228b22);
-          embed.setDescription("This user has been verified!");
+          embed.color = 0x228b22;
+          embed.description = "This user has been verified!";
           interaction.update({
             embeds: [embed],
             components: [],
