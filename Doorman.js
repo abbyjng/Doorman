@@ -4,6 +4,7 @@ const {
   Partials,
   ActionRowBuilder,
   ButtonBuilder,
+  EmbedBuilder,
   ButtonStyle,
 } = require("discord.js");
 const auth = require("./auth.json");
@@ -253,7 +254,8 @@ client.on("interactionCreate", async function (interaction) {
 
           sql = `SELECT name FROM users WHERE userid = ?`;
           let data = await db.get(sql, [userid]);
-          member.setNickname(data.name).catch(() => {
+          member.setNickname(data.name).catch((e) => {
+            console.log(e);
             client.channels.fetch("1011373609064861837").then((channel) => {
               channel.send({
                 embeds: [
@@ -276,10 +278,12 @@ client.on("interactionCreate", async function (interaction) {
           });
 
           let embed = interaction.message.embeds[0];
-          embed.color = 0x228b22;
-          embed.description = "This user has been verified!";
+          const newEmbed = new EmbedBuilder()
+            .setColor(0x228b22)
+            .setDescription("This user has been verified!")
+            .addFields(embed.fields);
           interaction.update({
-            embeds: [embed],
+            embeds: [newEmbed],
             components: [],
           });
         } else if (split[2] === "kick") {
@@ -295,10 +299,12 @@ client.on("interactionCreate", async function (interaction) {
           });
 
           let embed = interaction.message.embeds[0];
-          embed.setColor(0xb83a36);
-          embed.setDescription("This user was rejected.");
+          const newEmbed = new EmbedBuilder()
+            .setColor(0xb83a36)
+            .setDescription("This user was rejected.")
+            .addFields(embed.fields);
           interaction.update({
-            embeds: [embed],
+            embeds: [newEmbed],
             components: [],
           });
         }
