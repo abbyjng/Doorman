@@ -10,6 +10,7 @@ const {
 const auth = require("./auth.json");
 const fs = require("fs");
 const { openDb } = require("./databaseHandler.js");
+const servers = require("./servers");
 
 let db;
 
@@ -66,14 +67,16 @@ client.on("ready", async () => {
 });
 
 client.on("guildMemberAdd", async function (member) {
-  let sql = `INSERT INTO users (userid, stage, name, uniqname) VALUES (?, 0, "", "")`;
-  await db.run(sql, [member.id]);
+  let sql = `INSERT INTO users (userid, stage, name, uniqname, serverid) VALUES (?, 0, "", "", ?)`;
+  await db.run(sql, [member.id, member.guild.id]);
+
+  const serverInfo = servers[member.guild.id];
 
   member
     .send({
       embeds: [
         {
-          description: `Welcome to the AIV server! Please fill out these quick questions so we can verify you're a real person.`,
+          description: `Welcome to the ${serverInfo.name} server! Please fill out these quick questions so we can verify you're a real person.`,
           color: 0x00274c,
         },
         {
@@ -169,8 +172,10 @@ client.on("interactionCreate", async function (interaction) {
             components: [],
           });
 
-          sql = `SELECT userid, name, uniqname FROM users WHERE userid = ?`;
+          sql = `SELECT userid, name, uniqname, serverid FROM users WHERE userid = ?`;
           let data = await db.get(sql, [userid]);
+
+          const serverInfo = servers[data.serverid];
 
           const buttons = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
@@ -183,7 +188,9 @@ client.on("interactionCreate", async function (interaction) {
               .setStyle(ButtonStyle.Danger)
           );
 
-          const channel = await client.channels.fetch("1011373609064861837");
+          const channel = await client.channels.fetch(
+            serverInfo.verificationChannel
+          );
           channel.send({
             embeds: [
               {
@@ -231,8 +238,9 @@ client.on("interactionCreate", async function (interaction) {
         break;
       case "VERIFY":
         if (split[2] === "admit") {
+          const serverInfo = servers[interaction.guild.id];
           let role = await interaction.guild.roles.cache.find(
-            (r) => r.id === "1011298638061899897"
+            (r) => r.id === serverInfo.roleId
           );
 
           const member = await interaction.guild.members.fetch({
@@ -240,38 +248,43 @@ client.on("interactionCreate", async function (interaction) {
             force: true,
           });
           member.roles.add(role).catch(() => {
-            client.channels.fetch("1011373609064861837").then((channel) => {
-              channel.send({
-                embeds: [
-                  {
-                    description: `Something went wrong when assigning roles to <@!${member.id}>! Please double check and correct their roles.`,
-                    color: 0xb83a36,
-                  },
-                ],
+            client.channels
+              .fetch(serverInfo.verificationChannel)
+              .then((channel) => {
+                channel.send({
+                  embeds: [
+                    {
+                      description: `Something went wrong when assigning roles to <@!${member.id}>! Please double check and correct their roles.`,
+                      color: 0xb83a36,
+                    },
+                  ],
+                });
               });
-            });
           });
 
-          sql = `SELECT name FROM users WHERE userid = ?`;
+          sql = `SELECT name, serverid FROM users WHERE userid = ?`;
           let data = await db.get(sql, [userid]);
+
           member.setNickname(data.name).catch((e) => {
             console.log(e);
-            client.channels.fetch("1011373609064861837").then((channel) => {
-              channel.send({
-                embeds: [
-                  {
-                    description: `Something went wrong when changing <@!${member.id}>'s nickname! Please double check and correct their nickname.`,
-                    color: 0xb83a36,
-                  },
-                ],
+            client.channels
+              .fetch(serverInfo.verificationChannel)
+              .then((channel) => {
+                channel.send({
+                  embeds: [
+                    {
+                      description: `Something went wrong when changing <@!${member.id}>'s nickname! Please double check and correct their nickname.`,
+                      color: 0xb83a36,
+                    },
+                  ],
+                });
               });
-            });
           });
 
           member.send({
             embeds: [
               {
-                description: `You have been admitted to the AIV server!`,
+                description: `You have been admitted to the ${serverInfo.name} server!`,
                 color: 0x228b22,
               },
             ],
@@ -288,11 +301,14 @@ client.on("interactionCreate", async function (interaction) {
           });
         } else if (split[2] === "kick") {
           const member = interaction.guild.members.cache.get(userid);
+
+          const serverInfo = servers[interaction.guild.id];
+
           member.kick();
           member.send({
             embeds: [
               {
-                description: `A verifier denied your survey and you were removed from the server. If you think something is wrong, rejoin the server at this link: https://discord.gg/NTZASbnCCM`,
+                description: `A verifier denied your survey and you were removed from the server. If you think something is wrong, rejoin the server at this link: ${serverInfo.inviteLink}`,
                 color: 0xb83a36,
               },
             ],
@@ -328,14 +344,14 @@ client.on("interactionCreate", async function (interaction) {
           break;
         }
 
-        sql = `INSERT INTO users (userid, stage, name, uniqname) VALUES (?, 0, "", "")`;
-        await db.run(sql, [interaction.user.id]);
+        sql = `INSERT INTO users (userid, stage, name, uniqname, serverid) VALUES (?, 0, "", "", ?)`;
+        await db.run(sql, [interaction.user.id, interaction.guild.id]);
 
         try {
           await interaction.user.send({
             embeds: [
               {
-                description: `Welcome to the AIV server! Please fill out these quick questions so we can verify you're a real person.`,
+                description: `Welcome to the ${serverInfo.name} server! Please fill out these quick questions so we can verify you're a real person.`,
                 color: 0x00274c,
               },
               {
