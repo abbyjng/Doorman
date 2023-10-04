@@ -92,11 +92,13 @@ client.on("guildMemberAdd", async function (member) {
 });
 
 client.on("messageCreate", async function (message) {
-  let sql = `SELECT stage FROM users WHERE userid = ?`;
+  let sql = `SELECT stage, serverid FROM users WHERE userid = ?`;
   let data = await db.get(sql, [message.author.id]);
   if (message.guild !== null || !data) {
     return;
   }
+
+  serverInfo = servers[data.serverid];
 
   switch (data.stage) {
     case 0:
@@ -105,7 +107,7 @@ client.on("messageCreate", async function (message) {
       message.author.send({
         embeds: [
           {
-            description: `2) What is your uniqname?`,
+            description: `2) What is your uniqname? If you are not a UMich student, please state your affiliation with ${serverInfo.name}.`,
             color: 0x00274c,
           },
         ],
