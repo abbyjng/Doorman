@@ -16,6 +16,7 @@
   "homepage": "https://github.com/abbyjng/Doorman#readme",
   "dependencies": {
     "discord.js": "^14.9.0",
+    "node-fetch": "^3.3.2",
     "sqlite": "^4.0.23",
     "sqlite3": "^5.0.2"
   }
