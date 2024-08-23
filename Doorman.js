@@ -11,6 +11,7 @@ const auth = require("./auth.json");
 const fs = require("fs");
 const { openDb } = require("./databaseHandler.js");
 const servers = require("./servers");
+const fetch = require("node-fetch");
 
 let db;
 
@@ -198,8 +199,9 @@ client.on("interactionCreate", async function (interaction) {
             } else {
               matchState = "not found";
             }
-          } catch {
+          } catch (e) {
             matchState = "failed";
+            console.error(e)
           }
 
           let fieldMatch = undefined;
