@@ -67,6 +67,30 @@ client.on("ready", async () => {
   console.log(`Logged in as ${client.user.tag}!`);
 });
 
+// Handle mutual exclusivity between AIV and Alumni roles
+client.on("guildMemberUpdate", async function (oldMember, newMember) {
+  // Only applicable in the UMich AIV server
+  if (newMember.guild.id === "1405304117684863068") {
+    const serverInfo = servers[newMember.guild.id];
+    let role = await newMember.guild.roles.cache.find(
+      (r) => r.id === serverInfo.roleId
+    );
+
+    const oldMemberHasAlumni = oldMember.roles
+      .valueOf()
+      .get(serverInfo.alumniRoleId);
+    const newMemberHasAlumni = newMember.roles
+      .valueOf()
+      .get(serverInfo.alumniRoleId);
+
+    if (oldMemberHasAlumni && !newMemberHasAlumni) {
+      newMember.roles.add(role);
+    } else if (!oldMemberHasAlumni && newMemberHasAlumni) {
+      newMember.roles.remove(role);
+    }
+  }
+});
+
 client.on("guildMemberAdd", async function (member) {
   let sql = `INSERT INTO users (userid, stage, name, uniqname, serverid) VALUES (?, 0, "", "", ?)`;
   await db.run(sql, [member.id, member.guild.id]);

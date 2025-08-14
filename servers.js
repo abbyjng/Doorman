@@ -3,6 +3,7 @@ const servers = {
     name: "AIV",
     verificationChannel: "1011373609064861837",
     roleId: "1011298638061899897",
+    alumniRoleId: "1011321074039922738",
     inviteLink: "https://discord.gg/NTZASbnCCM",
   },
   "1130963758202753035": {
