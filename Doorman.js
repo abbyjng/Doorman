@@ -70,7 +70,7 @@ client.on("ready", async () => {
 // Handle mutual exclusivity between AIV and Alumni roles
 client.on("guildMemberUpdate", async function (oldMember, newMember) {
   // Only applicable in the UMich AIV server
-  if (newMember.guild.id === "1405304117684863068") {
+  if (newMember.guild.id === "1011279000389300334") {
     const serverInfo = servers[newMember.guild.id];
     let role = await newMember.guild.roles.cache.find(
       (r) => r.id === serverInfo.roleId
