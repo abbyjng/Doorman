@@ -203,58 +203,11 @@ client.on("interactionCreate", async function (interaction) {
           let data = await db.get(sql, [userid]);
 
           const serverInfo = servers[data.serverid];
-
-          let matchState = "no match";
-          try {
-            const res = await fetch(
-              `https://mcommunity.umich.edu/api/people/${data.uniqname}/`
-            );
-            const body = await res.text();
-            const jsonBody = JSON.parse(body);
-
-            if (jsonBody["givenName"]) {
-              const mcommName =
-                jsonBody["givenName"]?.toLowerCase() +
-                jsonBody["surname"]?.toLowerCase();
-              const surveyName = data.name.toLowerCase().split(" ").join("");
-              if (mcommName === surveyName) {
-                matchState = "matched";
-              }
-            } else {
-              matchState = "not found";
-            }
-          } catch (e) {
-            matchState = "failed";
-            console.error(e)
-          }
-
-          let fieldMatch = undefined;
-          switch (matchState) {
-            case "matched":
-              fieldMatch = {
+          
+          let fieldMatch = {
                 name: "MCommunity Verification",
-                value: `✅ Name matches uniqname on MCommunity ✅\n➡️ https://mcommunity.umich.edu/?value=${data.uniqname}`,
+                value: `Manually validate the uniqname matches the name on MCommunity: \n➡️ https://mcommunity.umich.edu/?value=${data.uniqname}`,
               };
-              break;
-            case "no match":
-              fieldMatch = {
-                name: "MCommunity Verification",
-                value: `⚠️ Uniqname does not match name on MCommunity, please verify carefully ⚠️\n➡️ https://mcommunity.umich.edu/?value=${data.uniqname}`,
-              };
-              break;
-            case "not found":
-              fieldMatch = {
-                name: "MCommunity Verification",
-                value: `❌ Uniqname was not found on MCommunity, please verify carefully ❌\n➡️ https://mcommunity.umich.edu/?value=${data.uniqname}`,
-              };
-              break;
-            default:
-              fieldMatch = {
-                name: "MCommunity Verification",
-                value: `❌ MCommunity verification failed to complete, please verify manually ❌\n➡️ https://mcommunity.umich.edu/?value=${data.uniqname}`,
-              };
-              break;
-          }
 
           const buttons = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
@@ -409,6 +362,9 @@ client.on("interactionCreate", async function (interaction) {
         break;
       case "RETRY":
         sql = `SELECT userid FROM users WHERE userid = ?`;
+
+        const serverInfo = servers[interaction.guild.id];
+
         let data = await db.get(sql, [interaction.user.id]);
         if (data) {
           interaction.reply({
@@ -450,7 +406,8 @@ client.on("interactionCreate", async function (interaction) {
             ],
             ephemeral: true,
           });
-        } catch {
+        } catch (e) {
+          console.log("Failed to send dm:", e)
           interaction.reply({
             embeds: [
               {
